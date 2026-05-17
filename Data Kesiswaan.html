@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Kesiswaan & CRM Caberawit</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- PENTING: Menggunakan Firebase SDK COMPAT agar kompatibel dengan pemanggilan script konvensional -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col font-sans">
+
+    <!-- Top Navigation Bar -->
+    <header class="bg-emerald-600 text-white shadow-md sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
+            <div class="flex items-center space-x-3">
+                <div class="bg-white p-2 rounded-lg text-emerald-600">
+                    <i class="fa-solid fa-users-line text-2xl"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold tracking-tight">CRM & Kesiswaan</h1>
+                    <p class="text-xs text-emerald-100">Sistem Informasi Pengajian Caberawit</p>
+                </div>
+            </div>
+            
+            <div class="flex items-center space-x-3">
+                <!-- Role Badge -->
+                <span id="roleBadge" class="bg-emerald-800 text-emerald-100 text-xs px-3 py-1.5 rounded-full font-medium flex items-center gap-1.5">
+                    <span class="w-2 h-2 rounded-full bg-slate-300 animate-pulse" id="roleDot"></span>
+                    <span id="roleText">Menghubungkan...</span>
+                </span>
+                
+                <!-- Login/Logout Button -->
+                <button id="authBtn" class="bg-white hover:bg-slate-100 text-emerald-700 font-semibold text-xs sm:text-sm px-4 py-2 rounded-lg shadow transition-all flex items-center gap-2">
+                    <i id="authIcon" class="fa-solid fa-right-to-bracket"></i>
+                    <span id="authBtnText">Login Pengurus</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        
+        <!-- Welcome banner -->
+        <div class="bg-gradient-to-r from-emerald-500 to-teal-600 rounded-2xl p-6 text-white mb-8 shadow-sm relative overflow-hidden">
+            <div class="absolute right-0 bottom-0 opacity-10 transform translate-x-10 translate-y-10">
+                <i class="fa-solid fa-graduation-cap text-[180px]"></i>
+            </div>
+            <div class="relative z-10 max-w-2xl">
+                <span class="bg-emerald-700/50 text-emerald-100 text-xs px-3 py-1 rounded-full uppercase tracking-wider font-semibold">Aplikasi 1 dari 3</span>
+                <h2 class="text-2xl sm:text-3xl font-bold mt-2">Database Utama & Informasi Kontak Siswa</h2>
+                <p class="text-emerald-50 text-sm sm:text-base mt-2">Daftar lengkap 30 siswa aktif Caberawit. Pengurus dapat memutakhirkan data orang tua serta langsung menghubungi via WhatsApp sekali klik.</p>
+            </div>
+        </div>
+
+        <!-- Admin Control Panel (Only Visible to Admin) -->
+        <div id="adminPanel" class="hidden bg-white border border-emerald-100 rounded-2xl p-6 shadow-sm mb-8 transition-all">
+            <div class="flex items-center justify-between border-b pb-4 mb-4">
+                <div class="flex items-center gap-2 text-emerald-700">
+                    <i class="fa-solid fa-user-gear text-xl"></i>
+                    <h3 class="font-bold text-lg">Panel Input & Edit Pengurus</h3>
+                </div>
+                <button onclick="toggleForm()" type="button" class="text-slate-500 hover:text-slate-800 text-sm font-semibold flex items-center gap-1">
+                    <i class="fa-solid fa-circle-minus" id="toggleFormIcon"></i>
+                    <span id="toggleFormText">Sembunyikan Formulir</span>
+                </button>
+            </div>
+            
+            <form id="studentForm" class="grid grid-cols-1 md:grid-cols-12 gap-4">
+                <input type="hidden" id="studentId">
+                <div class="md:col-span-4">
+                    <label class="block text-xs font-bold text-slate-600 uppercase mb-1">Nama Lengkap Siswa <span class="text-red-500">*</span></label>
+                    <input type="text" id="studentName" required class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none text-sm" placeholder="Contoh: Nabihan">
+                </div>
+                <div class="md:col-span-4">
+                    <label class="block text-xs font-bold text-slate-600 uppercase mb-1">Nama Orang Tua / Wali</label>
+                    <input type="text" id="parentName" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none text-sm" placeholder="Contoh: Pak Budi">
+                </div>
+                <div class="md:col-span-4">
+                    <label class="block text-xs font-bold text-slate-600 uppercase mb-1">No. WhatsApp Orang Tua</label>
+                    <div class="relative">
+                        <span class="absolute left-3 top-2.5 text-slate-400 text-sm">+62</span>
+                        <input type="tel" id="whatsappNumber" class="w-full pl-12 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none text-sm" placeholder="8123456789">
+                    </div>
+                </div>
+                <div class="md:col-span-4">
+                    <label class="block text-xs font-bold text-slate-600 uppercase mb-1">Status Keaktifan</label>
+                    <select id="studentStatus" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none text-sm bg-white">
+                        <option value="Aktif">Aktif</option>
+                        <option value="Izin Panjang">Izin Panjang</option>
+                        <option value="Alumni">Alumni / Lulus</option>
+                    </select>
+                </div>
+                <div class="md:col-span-8 flex items-end gap-2">
+                    <button type="submit" id="saveBtn" class="flex-grow bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2 px-4 rounded-lg text-sm transition shadow flex justify-center items-center gap-2">
+                        <i class="fa-solid fa-floppy-disk"></i> Simpan Data
+                    </button>
+                    <button type="button" id="deleteFormBtn" onclick="deleteFormStudent()" class="hidden bg-rose-600 hover:bg-rose-700 text-white font-semibold py-2 px-4 rounded-lg text-sm transition shadow flex justify-center items-center gap-2">
+                        <i class="fa-solid fa-trash-can"></i> Hapus Siswa
+                    </button>
+                    <button type="button" onclick="resetForm()" class="bg-slate-200 hover:bg-slate-300 text-slate-700 font-semibold py-2 px-4 rounded-lg text-sm transition">
+                        Batal
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Quick Statistics -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+            <div class="bg-white p-4 rounded-xl border border-slate-100 shadow-sm flex items-center space-x-4">
+                <div class="p-3 rounded-lg bg-emerald-50 text-emerald-600">
+                    <i class="fa-solid fa-child text-2xl"></i>
+                </div>
+                <div>
+                    <p class="text-xs text-slate-500 font-medium uppercase">Total Siswa</p>
+                    <p class="text-xl font-bold" id="statTotal">0</p>
+                </div>
+            </div>
+            <div class="bg-white p-4 rounded-xl border border-slate-100 shadow-sm flex items-center space-x-4">
+                <div class="p-3 rounded-lg bg-teal-50 text-teal-600">
+                    <i class="fa-solid fa-circle-check text-2xl"></i>
+                </div>
+                <div>
+                    <p class="text-xs text-slate-500 font-medium uppercase">Siswa Aktif</p>
+                    <p class="text-xl font-bold" id="statActive">0</p>
+                </div>
+            </div>
+            <div class="bg-white p-4 rounded-xl border border-slate-100 shadow-sm flex items-center space-x-4">
+                <div class="p-3 rounded-lg bg-indigo-50 text-indigo-600">
+                    <i class="fa-solid fa-address-book text-2xl"></i>
+                </div>
+                <div>
+                    <p class="text-xs text-slate-500 font-medium uppercase">Data No. HP</p>
+                    <p class="text-xl font-bold" id="statContacts">0</p>
+                </div>
+            </div>
+            <div class="bg-white p-4 rounded-xl border border-slate-100 shadow-sm flex items-center space-x-4">
+                <div class="p-3 rounded-lg bg-amber-50 text-amber-600">
+                    <i class="fa-solid fa-circle-question text-2xl"></i>
+                </div>
+                <div>
+                    <p class="text-xs text-slate-500 font-medium uppercase">Belum Lengkap</p>
+                    <p class="text-xl font-bold text-amber-600" id="statIncomplete">0</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Filter and Search Bar -->
+        <div class="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm mb-6 flex flex-col md:flex-row gap-4 items-center justify-between">
+            <div class="relative w-full md:w-96">
+                <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                </span>
+                <input type="text" id="searchBar" oninput="filterStudents()" class="w-full pl-10 pr-4 py-2 border rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none text-sm" placeholder="Cari nama siswa atau orang tua...">
+            </div>
+            
+            <div class="flex gap-2 w-full md:w-auto overflow-x-auto pb-1 md:pb-0">
+                <button onclick="setFilter('all')" id="filterAll" class="filter-btn active bg-emerald-100 text-emerald-800 text-xs px-4 py-2 rounded-full font-semibold transition-all"> Semua </button>
+                <button onclick="setFilter('lengkap')" id="filterLengkap" class="filter-btn bg-slate-100 text-slate-600 hover:bg-slate-200 text-xs px-4 py-2 rounded-full font-semibold transition-all"> Data Lengkap </button>
+                <button onclick="setFilter('belum')" id="filterBelum" class="filter-btn bg-slate-100 text-slate-600 hover:bg-slate-200 text-xs px-4 py-2 rounded-full font-semibold transition-all"> Belum Ada Kontak </button>
+            </div>
+        </div>
+
+        <!-- Student Grid/Table List -->
+        <div class="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden font-sans">
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-slate-100 border-b border-slate-200 text-slate-600 text-xs font-bold uppercase">
+                            <th class="px-6 py-4">ID</th>
+                            <th class="px-6 py-4">Nama Siswa</th>
+                            <th class="px-6 py-4">Orang Tua / Wali</th>
+                            <th class="px-6 py-4">Kontak WhatsApp</th>
+                            <th class="px-6 py-4">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="studentTableBody" class="divide-y divide-slate-100 text-sm">
+                        <!-- Loading State -->
+                        <tr>
+                            <td colspan="5" class="text-center py-10 text-slate-400">
+                                <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-slate-300 border-t-emerald-600 mb-2"></div>
+                                <p>Menghubungkan ke cloud database...</p>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Custom Notification Toast -->
+        <div id="toast" class="fixed bottom-6 right-6 bg-slate-800 text-white px-6 py-3 rounded-xl shadow-2xl transition-all duration-300 transform translate-y-24 opacity-0 flex items-center space-x-2 z-50">
+            <i id="toastIcon" class="fa-solid fa-circle-info text-emerald-400"></i>
+            <span id="toastMessage" class="text-sm font-medium">Notifikasi</span>
+        </div>
+
+        <!-- Embedded Firebase Authentication Modal -->
+        <div id="authModal" class="fixed inset-0 bg-slate-950/50 backdrop-blur-sm flex justify-center items-center z-50 hidden">
+            <div class="bg-white p-6 sm:p-8 rounded-2xl shadow-2xl max-w-md w-full mx-4 border border-slate-100">
+                <div class="flex justify-between items-center border-b pb-4 mb-4">
+                    <h3 class="text-lg font-bold text-slate-800">Akses Masuk Pengurus</h3>
+                    <button onclick="closeAuthModal()" type="button" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+                </div>
+                <div class="mb-4 text-xs text-amber-700 bg-amber-50 p-3 rounded-lg border border-amber-200">
+                    <i class="fa-solid fa-shield-halved"></i> Hanya Pengurus yang memiliki hak akses modifikasi data. Wali Murid disarankan menggunakan akses Publik (View-Only).
+                </div>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-600 uppercase mb-1">ID Pengurus</label>
+                        <input type="text" id="loginEmail" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none text-sm" placeholder="penguruscaberawit2026">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-600 uppercase mb-1">Kata Sandi</label>
+                        <input type="password" id="loginPassword" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none text-sm" placeholder="••••••••">
+                    </div>
+                    <button id="submitLoginBtn" type="button" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-4 rounded-lg text-sm transition shadow flex justify-center items-center gap-2">
+                        Masuk Ke Sistem
+                    </button>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Footer Switcher -->
+    <footer class="bg-slate-900 text-slate-400 py-8 border-t border-slate-800 mt-12">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex flex-col md:flex-row justify-between items-center gap-6">
+                <div>
+                    <p class="text-sm text-slate-200 font-bold">Aplikasi Ekosistem Digital Caberawit</p>
+                    <p class="text-xs text-slate-500">Pusat Informasi Organisasi Daerah LDII - Caberawit Team</p>
+                </div>
+                <div class="flex flex-wrap gap-3">
+                    <a href="app_kesiswaan.html" class="bg-emerald-600 text-white text-xs font-bold px-4 py-2.5 rounded-lg flex items-center gap-2 shadow"><i class="fa-solid fa-users"></i> App 1: CRM & Kesiswaan</a>
+                    <a href="app_galeri.html" class="bg-slate-800 text-slate-200 hover:bg-slate-700 text-xs font-bold px-4 py-2.5 rounded-lg flex items-center gap-2 transition"><i class="fa-solid fa-images"></i> App 2: Galeri Dokumentasi</a>
+                    <a href="app_pembelajaran.html" class="bg-slate-800 text-slate-200 hover:bg-slate-700 text-xs font-bold px-4 py-2.5 rounded-lg flex items-center gap-2 transition"><i class="fa-solid fa-chart-line"></i> App 3: Pemantauan Belajar</a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Core Database & Logic Scripts -->
+    <script>
+        // --- 1. FIREBASE SETUP (RULE 3) ---
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
+            apiKey: "",
+            authDomain: "default-demo.firebaseapp.com",
+            projectId: "default-demo",
+            storageBucket: "default-demo.appspot.com",
+            messagingSenderId: "123456",
+            appId: "1:123456:web:123"
+        };
+        
+        // Inisialisasi Firebase App
+        const app = firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-caberawit';
+
+        // 30 Siswa Utama
+        const initialStudents = [
+            "Nabihan", "Quenna", "Nia", "Mecca", "Afra", "Hiskil", "Mei", "Rere", "Pita", "Andira",
+            "Ghendis", "Rizal", "Adit", "Faqih", "Bulan", "Aisyah", "Leon", "Bayu", "Jasmine", "Allysa",
+            "Abi", "Alka", "Mareta", "Cessa", "Cessi", "Leta", "Rafka", "Ellen", "Chissel", "Gibran"
+        ];
+
+        let currentFilter = 'all';
+        let allStudents = [];
+        let isFormVisible = true;
+        let simulatedAdminActive = false; // Flag untuk akses pengurus simulasi 1 pintu jika offline/firebase tidak terdaftar
+
+        // Fungsi pengecekan hak pengurus
+        function isAdminUser() {
+            if (simulatedAdminActive) return true;
+            const user = auth.currentUser;
+            return user && !user.isAnonymous;
+        }
+
+        // Inisialisasi Autentikasi sesuai aturan RULE 3
+        const initAuth = async () => {
+            try {
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await auth.signInWithCustomToken(__initial_auth_token);
+                } else {
+                    await auth.signInAnonymously();
+                }
+            } catch (err) {
+                console.error("Auth initialization failed. Trying anonymous login...", err);
+                try {
+                    await auth.signInAnonymously();
+                } catch (anonErr) {
+                    showToast("Sistem offline. Menggunakan data lokal.", "error");
+                }
+            }
+        };
+
+        // Fungsi sinkronisasi status UI & Peran Pengurus
+        function updateUIRole(hasAdminRights) {
+            const roleBadge = document.getElementById('roleBadge');
+            const roleDot = document.getElementById('roleDot');
+            const roleText = document.getElementById('roleText');
+            const authBtn = document.getElementById('authBtn');
+            const authIcon = document.getElementById('authIcon');
+            const authBtnText = document.getElementById('authBtnText');
+            const adminPanel = document.getElementById('adminPanel');
+
+            if (hasAdminRights) {
+                // Sesi Pengurus Terdeteksi
+                roleBadge.className = "bg-rose-600 text-rose-50 text-xs px-3 py-1.5 rounded-full font-medium flex items-center gap-1.5";
+                roleDot.className = "w-2 h-2 rounded-full bg-white animate-ping";
+                roleText.innerText = "Sistem Pengurus (Akses Edit)";
+                
+                authIcon.className = "fa-solid fa-right-from-bracket";
+                authBtnText.innerText = "Keluar Admin";
+                adminPanel.classList.remove('hidden');
+                showToast("Sesi masuk pengurus aktif!", "success");
+            } else {
+                // Mode Wali Murid (View-Only)
+                roleBadge.className = "bg-emerald-800 text-emerald-100 text-xs px-3 py-1.5 rounded-full font-medium flex items-center gap-1.5";
+                roleDot.className = "w-2 h-2 rounded-full bg-emerald-400";
+                roleText.innerText = "Wali Murid (Lihat Saja)";
+                
+                authIcon.className = "fa-solid fa-right-to-bracket";
+                authBtnText.innerText = "Login Pengurus";
+                adminPanel.classList.add('hidden');
+                resetForm();
+            }
+            renderTable();
+        }
+
+        // UI Listener untuk perubahan hak akses (Role)
+        auth.onAuthStateChanged((user) => {
+            if (simulatedAdminActive) {
+                updateUIRole(true);
+                fetchStudents(user || { uid: "simulated_admin" });
+            } else {
+                updateUIRole(user && !user.isAnonymous);
+                if (user) {
+                    fetchStudents(user);
+                }
+            }
+        });
+
+        // Jalankan Autentikasi Awal
+        initAuth();
+
+        // --- 2. RETRIEVE DATA SECARA REALTIME (RULE 1) ---
+        async function fetchStudents(user) {
+            if (!user) return;
+            
+            // Mengikuti aturan path STRICT (RULE 1)
+            const collectionRef = db.collection('artifacts', appId, 'public', 'data', 'students_caberawit');
+            
+            collectionRef.onSnapshot((snapshot) => {
+                if (snapshot.empty) {
+                    // Masukkan 30 data siswa secara instan jika DB baru
+                    initializeDefaultStudents();
+                    return;
+                }
+                
+                allStudents = [];
+                snapshot.forEach(doc => {
+                    allStudents.push({ id: doc.id, ...doc.data() });
+                });
+                
+                // Urutkan berdasarkan nomor urut ID
+                allStudents.sort((a, b) => a.id_seq.localeCompare(b.id_seq));
+                
+                updateStatistics();
+                renderTable();
+            }, (error) => {
+                console.error("Firestore loading error:", error);
+                showToast("Gagal memuat data dari pusat penyimpanan cloud.", "error");
+            });
+        }
+
+        // Seeding database awal
+        async function initializeDefaultStudents() {
+            const batch = db.batch();
+            const collectionRef = db.collection('artifacts', appId, 'public', 'data', 'students_caberawit');
+            
+            initialStudents.forEach((name, index) => {
+                const seq = String(index + 1).padStart(3, '0');
+                const docRef = collectionRef.doc(`CR${seq}`);
+                batch.set(docRef, {
+                    id_seq: `CR${seq}`,
+                    name: name,
+                    parent_name: "",
+                    whatsapp: "",
+                    status: "Aktif",
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+            });
+            
+            await batch.commit();
+            showToast("Database awal 30 siswa berhasil disinkronkan!", "success");
+        }
+
+        // --- 3. UI OPERATIONS ---
+        function renderTable() {
+            const tbody = document.getElementById('studentTableBody');
+            const query = document.getElementById('searchBar').value.toLowerCase();
+            const isAdmin = isAdminUser();
+            
+            let filtered = allStudents;
+            
+            if (currentFilter === 'lengkap') {
+                filtered = allStudents.filter(s => s.whatsapp && s.parent_name);
+            } else if (currentFilter === 'belum') {
+                filtered = allStudents.filter(s => !s.whatsapp || !s.parent_name);
+            }
+            
+            if (query) {
+                filtered = filtered.filter(s => 
+                    s.name.toLowerCase().includes(query) || 
+                    (s.parent_name && s.parent_name.toLowerCase().includes(query))
+                );
+            }
+            
+            if (filtered.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="5" class="text-center py-10 text-slate-400">
+                            <i class="fa-solid fa-magnifying-glass text-3xl mb-2 block text-slate-300"></i>
+                            Data siswa tidak ditemukan.
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+            
+            tbody.innerHTML = filtered.map(student => {
+                const parentNameLabel = student.parent_name ? student.parent_name : `<span class="text-amber-500 italic text-xs"><i class="fa-solid fa-circle-exclamation"></i> Belum isi</span>`;
+                
+                let contactAction = `<span class="text-slate-400 italic text-xs">Tidak ada nomor</span>`;
+                if (student.whatsapp) {
+                    const cleanNum = student.whatsapp.replace(/\D/g, '');
+                    contactAction = `
+                        <a href="https://wa.me/62${cleanNum}?text=Assalamualaikum%20Bapak%2FIbu%20Wali%20Murid%20dari%20${encodeURIComponent(student.name)}..." 
+                           target="_blank" 
+                           class="inline-flex items-center gap-1.5 text-emerald-600 hover:text-emerald-700 font-bold bg-emerald-50 hover:bg-emerald-100 py-1 px-3 rounded-full text-xs transition-colors border border-emerald-100">
+                            <i class="fa-brands fa-whatsapp text-sm"></i> +62 ${student.whatsapp}
+                        </a>
+                    `;
+                }
+                
+                let statusBadge = `<span class="bg-emerald-100 text-emerald-800 text-xs px-2.5 py-1 rounded-full font-medium">Aktif</span>`;
+                if (student.status === "Izin Panjang") {
+                    statusBadge = `<span class="bg-amber-100 text-amber-800 text-xs px-2.5 py-1 rounded-full font-medium">Izin</span>`;
+                } else if (student.status === "Alumni") {
+                    statusBadge = `<span class="bg-slate-100 text-slate-600 text-xs px-2.5 py-1 rounded-full font-medium">Alumni</span>`;
+                }
+
+                // Baris tabel siswa interaktif dan dapat diklik untuk mengedit jika mode admin aktif
+                return `
+                    <tr class="transition-colors hover:bg-slate-100/80 ${isAdmin ? 'cursor-pointer border-l-4 border-l-transparent hover:border-l-emerald-500' : ''}" 
+                        onclick="${isAdmin ? `editStudent('${student.id}')` : ''}">
+                        <td class="px-6 py-4 font-bold text-slate-500 text-xs">${student.id_seq}</td>
+                        <td class="px-6 py-4 font-bold text-slate-900">${student.name} ${isAdmin ? '<span class="text-[10px] bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded ml-1 font-normal"><i class="fa-solid fa-pen"></i> Edit</span>' : ''}</td>
+                        <td class="px-6 py-4 text-slate-700">${parentNameLabel}</td>
+                        <td class="px-6 py-4" onclick="event.stopPropagation();">${contactAction}</td>
+                        <td class="px-6 py-4">${statusBadge}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function updateStatistics() {
+            const total = allStudents.length;
+            const active = allStudents.filter(s => s.status === 'Aktif').length;
+            const complete = allStudents.filter(s => s.whatsapp && s.parent_name).length;
+            const incomplete = total - complete;
+
+            document.getElementById('statTotal').innerText = total;
+            document.getElementById('statActive').innerText = active;
+            document.getElementById('statContacts').innerText = complete;
+            document.getElementById('statIncomplete').innerText = incomplete;
+        }
+
+        function setFilter(filter) {
+            currentFilter = filter;
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                btn.classList.remove('active', 'bg-emerald-100', 'text-emerald-800');
+                btn.classList.add('bg-slate-100', 'text-slate-600');
+            });
+            
+            const activeBtn = document.getElementById(filter === 'all' ? 'filterAll' : filter === 'lengkap' ? 'filterLengkap' : 'filterBelum');
+            activeBtn.classList.remove('bg-slate-100', 'text-slate-600');
+            activeBtn.classList.add('active', 'bg-emerald-100', 'text-emerald-800');
+            
+            renderTable();
+        }
+
+        function filterStudents() {
+            renderTable();
+        }
+
+        function toggleForm() {
+            const form = document.getElementById('studentForm');
+            const icon = document.getElementById('toggleFormIcon');
+            const text = document.getElementById('toggleFormText');
+            
+            isFormVisible = !isFormVisible;
+            if (isFormVisible) {
+                form.classList.remove('hidden');
+                icon.className = "fa-solid fa-circle-minus";
+                text.innerText = "Sembunyikan Formulir";
+            } else {
+                form.classList.add('hidden');
+                icon.className = "fa-solid fa-circle-plus";
+                text.innerText = "Tampilkan Formulir";
+            }
+        }
+
+        // --- 4. WRITE & UPDATE ACTIONS ---
+        const form = document.getElementById('studentForm');
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            if (!isAdminUser()) {
+                showToast("Ditolak: Masuk sebagai Pengurus terlebih dahulu!", "error");
+                return;
+            }
+
+            const id = document.getElementById('studentId').value;
+            const name = document.getElementById('studentName').value.trim();
+            const parentName = document.getElementById('parentName').value.trim();
+            const whatsapp = document.getElementById('whatsappNumber').value.trim();
+            const studentStatus = document.getElementById('studentStatus').value;
+
+            if (!name) return;
+
+            const collectionRef = db.collection('artifacts', appId, 'public', 'data', 'students_caberawit');
+
+            try {
+                if (id) {
+                    await collectionRef.doc(id).update({
+                        name: name,
+                        parent_name: parentName,
+                        whatsapp: whatsapp,
+                        status: studentStatus,
+                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                    showToast(`Data ${name} berhasil dimutakhirkan!`, "success");
+                } else {
+                    const newSeq = `CR${String(allStudents.length + 1).padStart(3, '0')}`;
+                    await collectionRef.doc(newSeq).set({
+                        id_seq: newSeq,
+                        name: name,
+                        parent_name: parentName,
+                        whatsapp: whatsapp,
+                        status: studentStatus,
+                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                    showToast(`Siswa baru ${name} berhasil ditambahkan!`, "success");
+                }
+                resetForm();
+            } catch (err) {
+                console.error("Save Error:", err);
+                showToast("Gagal menyimpan data ke cloud.", "error");
+            }
+        });
+
+        function editStudent(id) {
+            const student = allStudents.find(s => s.id === id);
+            if (!student) return;
+
+            document.getElementById('studentId').value = student.id;
+            document.getElementById('studentName').value = student.name;
+            document.getElementById('parentName').value = student.parent_name || "";
+            document.getElementById('whatsappNumber').value = student.whatsapp || "";
+            document.getElementById('studentStatus').value = student.status || "Aktif";
+
+            document.getElementById('saveBtn').innerHTML = `<i class="fa-solid fa-file-pen"></i> Simpan Perubahan`;
+            
+            // Tampilkan tombol Hapus Siswa di Form ketika mengedit
+            document.getElementById('deleteFormBtn').classList.remove('hidden');
+
+            window.scrollTo({ top: 150, behavior: 'smooth' });
+        }
+
+        // Fungsi hapus yang diintegrasikan langsung ke dalam form panel edit
+        async function deleteFormStudent() {
+            if (!isAdminUser()) return;
+            
+            const id = document.getElementById('studentId').value;
+            if (!id) return;
+
+            const student = allStudents.find(s => s.id === id);
+            if (!student) return;
+
+            const konfirmasi = confirm(`Hapus data siswa ${student.name} secara permanen dari server?`);
+            if (!konfirmasi) return;
+
+            try {
+                await db.collection('artifacts', appId, 'public', 'data', 'students_caberawit').doc(id).delete();
+                showToast(`Data ${student.name} berhasil dihapus dari sistem.`, "success");
+                resetForm();
+            } catch (err) {
+                console.error("Delete Error:", err);
+                showToast("Gagal menghapus data dari cloud.", "error");
+            }
+        }
+
+        function resetForm() {
+            form.reset();
+            document.getElementById('studentId').value = "";
+            document.getElementById('saveBtn').innerHTML = `<i class="fa-solid fa-floppy-disk"></i> Simpan Data`;
+            document.getElementById('deleteFormBtn').classList.add('hidden');
+        }
+
+        // --- 5. SYSTEM AUTHENTICATION (1 Pintu Resmi) ---
+        document.getElementById('authBtn').addEventListener('click', async () => {
+            if (isAdminUser()) {
+                // Logout dan kembalikan ke akun anonim
+                simulatedAdminActive = false;
+                await auth.signOut();
+                await auth.signInAnonymously();
+                showToast("Berhasil keluar dari sesi Pengurus.", "info");
+            } else {
+                // Tampilkan Jendela Modal Input Login
+                document.getElementById('authModal').classList.remove('hidden');
+            }
+        });
+
+        function closeAuthModal() {
+            document.getElementById('authModal').classList.add('hidden');
+        }
+
+        document.getElementById('submitLoginBtn').addEventListener('click', async () => {
+            const usernameInput = document.getElementById('loginEmail').value.trim();
+            const passwordInput = document.getElementById('loginPassword').value;
+
+            if (!usernameInput || !passwordInput) {
+                showToast("ID Pengurus dan kata sandi harus diisi lengkap!", "error");
+                return;
+            }
+
+            // Integrasi Akun 1 Pintu Resmi
+            if (usernameInput === "penguruscaberawit2026" && passwordInput === "caberawit2026?") {
+                try {
+                    // Masuk menggunakan kredensial email Firebase di latar belakang
+                    await auth.signInWithEmailAndPassword("penguruscaberawit2026@caberawit.id", "caberawit2026?");
+                    closeAuthModal();
+                } catch (error) {
+                    // Fallback Akses Simulasi Pengurus Lokal (Menghindari gangguan jika akun belum didaftarkan di Firebase Console Anda)
+                    console.warn("Autentikasi Firebase ditolak. Mengaktifkan sesi simulasi lokal pengurus...", error);
+                    simulatedAdminActive = true;
+                    updateUIRole(true);
+                    closeAuthModal();
+                }
+            } else {
+                showToast("ID Pengurus atau Kata Sandi salah!", "error");
+            }
+        });
+
+        // Toast Helper
+        function showToast(message, type = "info") {
+            const toast = document.getElementById('toast');
+            const toastMessage = document.getElementById('toastMessage');
+            const toastIcon = document.getElementById('toastIcon');
+
+            toastMessage.innerText = message;
+            
+            if (type === "success") {
+                toastIcon.className = "fa-solid fa-circle-check text-emerald-400 text-lg";
+                toast.className = "fixed bottom-6 right-6 bg-slate-900 text-white px-6 py-4 rounded-xl shadow-2xl flex items-center space-x-3 z-50 transform translate-y-0 opacity-100 transition-all duration-300 border-l-4 border-emerald-500";
+            } else if (type === "error") {
+                toastIcon.className = "fa-solid fa-circle-exclamation text-rose-500 text-lg";
+                toast.className = "fixed bottom-6 right-6 bg-slate-900 text-white px-6 py-4 rounded-xl shadow-2xl flex items-center space-x-3 z-50 transform translate-y-0 opacity-100 transition-all duration-300 border-l-4 border-rose-500";
+            } else {
+                toastIcon.className = "fa-solid fa-circle-info text-sky-400 text-lg";
+                toast.className = "fixed bottom-6 right-6 bg-slate-900 text-white px-6 py-4 rounded-xl shadow-2xl flex items-center space-x-3 z-50 transform translate-y-0 opacity-100 transition-all duration-300 border-l-4 border-sky-400";
+            }
+
+            setTimeout(() => {
+                toast.className = "fixed bottom-6 right-6 bg-slate-800 text-white px-6 py-3 rounded-xl shadow-2xl transition-all duration-300 transform translate-y-24 opacity-0 flex items-center space-x-2 z-50";
+            }, 3500);
+        }
+    </script>
+</body>
+                  </html>
